@@ -1,0 +1,28 @@
+# Core FastAPI
+fastapi==0.115.0
+uvicorn==0.32.0
+python-dotenv==1.0.1
+
+# Database - motor includes pymongo automatically
+motor>=3.6.0
+
+# Auth & Security
+pyjwt==2.9.0
+bcrypt==4.2.0
+python-jose==3.3.0
+passlib==1.7.4
+
+# Validation
+pydantic==2.9.2
+email-validator==2.2.0
+
+# Email
+resend==2.6.0
+
+# Utils
+python-dateutil==2.9.0
+requests==2.32.3
+python-multipart==0.0.12
+
+# Serverless
+mangum==0.19.0
