@@ -1,32 +1,50 @@
 """
-Vercel Serverless Adapter for Earl's Landscaping Backend
+Vercel Serverless Adapter
 """
+from mangum import Mangum
 import sys
 import os
-import traceback
 
-# Add parent directory to path  
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Add parent directory to path
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-# Simple WSGI handler for Vercel
-def handler(event, context):
-    """AWS Lambda/Vercel handler"""
-    try:
-        # Import here to catch import errors
-        from server import app
-        from mangum import Mangum
+# Import FastAPI app - lazy import to catch errors
+app = None
+
+class SafeMangum:
+    def __init__(self):
+        self.app = None
+        self.error = None
+        self._load_app()
+    
+    def _load_app(self):
+        global app
+        try:
+            from server import app as fastapi_app
+            app = fastapi_app
+            self.app = Mangum(fastapi_app, lifespan="off")
+        except Exception as e:
+            self.error = str(e)
+            import traceback
+            self.error_trace = traceback.format_exc()
+    
+    def __call__(self, event, context):
+        if self.app:
+            return self.app(event, context)
         
-        mangum = Mangum(app, lifespan="off")
-        return mangum(event, context)
-    except Exception as e:
-        error_details = f"Error: {str(e)}\nTraceback: {traceback.format_exc()}"
-        print(error_details)  # Log to Vercel logs
-        
+        import json
         return {
             "statusCode": 500,
             "headers": {"Content-Type": "application/json"},
-            "body": f'{{"error": "Server initialization error", "message": "{str(e).replace(chr(34), chr(92)+chr(34))}"}}'
+            "body": json.dumps({
+                "status": "error",
+                "message": "Failed to load FastAPI app",
+                "error": self.error,
+                "traceback": getattr(self, 'error_trace', None),
+                "path": event.get('path'),
+                "method": event.get('httpMethod')
+            })
         }
 
-# For direct import
-app = handler
+# Create handler
+handler = SafeMangum()
