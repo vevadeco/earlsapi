@@ -1,50 +1,39 @@
 """
 Vercel Serverless Adapter
 """
-from mangum import Mangum
 import sys
 import os
 
-# Add parent directory to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-
-# Import FastAPI app - lazy import to catch errors
-app = None
-
-class SafeMangum:
-    def __init__(self):
-        self.app = None
-        self.error = None
-        self._load_app()
+def handler(event, context):
+    """Lambda handler for Vercel"""
+    import json
+    import traceback
     
-    def _load_app(self):
-        global app
-        try:
-            from server import app as fastapi_app
-            app = fastapi_app
-            self.app = Mangum(fastapi_app, lifespan="off")
-        except Exception as e:
-            self.error = str(e)
-            import traceback
-            self.error_trace = traceback.format_exc()
-    
-    def __call__(self, event, context):
-        if self.app:
-            return self.app(event, context)
+    try:
+        # Add parent to path
+        sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
         
-        import json
+        # Try to import
+        from fastapi import FastAPI
+        
+        # Try to import server app
+        from server import app
+        
+        from mangum import Mangum
+        mangum = Mangum(app, lifespan="off")
+        return mangum(event, context)
+        
+    except Exception as e:
+        tb = traceback.format_exc()
         return {
-            "statusCode": 500,
+            "statusCode": 200,  # Return 200 so we can see error
             "headers": {"Content-Type": "application/json"},
             "body": json.dumps({
-                "status": "error",
-                "message": "Failed to load FastAPI app",
-                "error": self.error,
-                "traceback": getattr(self, 'error_trace', None),
-                "path": event.get('path'),
-                "method": event.get('httpMethod')
+                "status": "startup_error",
+                "error": str(e),
+                "traceback": tb,
+                "cwd": os.getcwd(),
+                "path": sys.path,
+                "env_keys": list(os.environ.keys())
             })
         }
-
-# Create handler
-handler = SafeMangum()
