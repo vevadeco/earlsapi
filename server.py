@@ -18,10 +18,19 @@ import resend
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-# MongoDB connection
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+# MongoDB connection - lazy init
+db = None
+client = None
+
+def get_db():
+    global db, client
+    if db is None:
+        mongo_url = os.environ.get('MONGO_URL')
+        if not mongo_url:
+            raise HTTPException(status_code=500, detail="MONGO_URL not configured")
+        client = AsyncIOMotorClient(mongo_url)
+        db = client[os.environ.get('DB_NAME', 'earls_prod')]
+    return db
 
 # Resend setup
 resend.api_key = os.environ.get('RESEND_API_KEY', '')
